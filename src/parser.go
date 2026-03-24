@@ -12,46 +12,92 @@ import (
 func ReadOBJ(path string) ([]Triangle, []Vector3, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("Error: Tidak bisa buka file: %w", err)
 	}
 	defer file.Close()
 
 	var allVertices []Vector3
 	var triangles []Triangle
+	var lineNum int
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
+		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+
+		// skip baris kosong atau komentar
+		if line == "" {
 			continue
 		}
 
 		parts := strings.Fields(line)
+
+		// validate punya parts minimal
+		if len(parts) == 0 {
+			continue
+		}
+
 		opcode := parts[0]
 
+		// vertex parsing (v x y z)
 		if opcode == "v" {
-			// Parsing Vertex: v x y z
-			x, _ := strconv.ParseFloat(parts[1], 64)
-			y, _ := strconv.ParseFloat(parts[2], 64)
-			z, _ := strconv.ParseFloat(parts[3], 64)
+			// validasi: harus tepat 4 bagian (v + 3 koordinat)
+			if len(parts) != 4 {
+				return nil, nil, fmt.Errorf(" PARSE ERROR Baris %d:\n   vertex harus 3 angka (v x y z)\n   dapet: %d item\n   data: %v", lineNum, len(parts)-1, parts)
+			}
+
+			// parse 3 koordinat sebagai float64
+			x, errX := strconv.ParseFloat(parts[1], 64)
+			y, errY := strconv.ParseFloat(parts[2], 64)
+			z, errZ := strconv.ParseFloat(parts[3], 64)
+
+			// validasi parsing berhasil
+			if errX != nil || errY != nil || errZ != nil {
+				return nil, nil, fmt.Errorf("PARSE ERROR Baris %d:\n   koordinat vertex harus angka (bukan text/huruf)\n   dapet: '%s' '%s' '%s'", lineNum, parts[1], parts[2], parts[3])
+			}
+
 			allVertices = append(allVertices, Vector3{X: x, Y: y, Z: z})
 
 		} else if opcode == "f" {
-			// Parsing Face: f i j k
-			idx1, _ := strconv.Atoi(strings.Split(parts[1], "/")[0])
-			idx2, _ := strconv.Atoi(strings.Split(parts[2], "/")[0])
-			idx3, _ := strconv.Atoi(strings.Split(parts[3], "/")[0])
+			// validasi: harus tepat 4 bagian (f + 3 indeks)
+			if len(parts) != 4 {
+				return nil, nil, fmt.Errorf("PARSE ERROR Baris %d:\n   face harus 3 index (f i j k)\n   dapet: %d item\n   data: %v", lineNum, len(parts)-1, parts)
+			}
 
+			// parsing 3 indeks (handle format i, i/vt, i/vt/vn)
+			idx1Str := strings.Split(parts[1], "/")[0]
+			idx2Str := strings.Split(parts[2], "/")[0]
+			idx3Str := strings.Split(parts[3], "/")[0]
+
+			// parse jadi integer
+			idx1, err1 := strconv.Atoi(idx1Str)
+			idx2, err2 := strconv.Atoi(idx2Str)
+			idx3, err3 := strconv.Atoi(idx3Str)
+
+			// validasi parsing berhasil
+			if err1 != nil || err2 != nil || err3 != nil {
+				return nil, nil, fmt.Errorf("PARSE ERROR Baris %d:\n   index face harus angka (bukan text/huruf)\n   dapet: '%s' '%s' '%s'", lineNum, idx1Str, idx2Str, idx3Str)
+			}
+
+			// validasi index dalam range
+			if idx1 < 1 || idx1 > len(allVertices) || idx2 < 1 || idx2 > len(allVertices) || idx3 < 1 || idx3 > len(allVertices) {
+				return nil, nil, fmt.Errorf("PARSE ERROR Baris %d:\n   index out of range (vertex tidak ada)\n   max vertex: %d, tapi dapet: %d %d %d", lineNum, len(allVertices), idx1, idx2, idx3)
+			}
+
+			// semua valid, tambah triangle
 			triangles = append(triangles, Triangle{
 				V1: allVertices[idx1-1],
 				V2: allVertices[idx2-1],
 				V3: allVertices[idx3-1],
 			})
+		} else {
+			// ERROR: typo atau format salah
+			return nil, nil, fmt.Errorf("PARSE ERROR Baris %d:\n   opcode tidak valid: '%s'\n   hanya bisa 'v' (vertex) atau 'f' (face)\n   data: %v", lineNum, opcode, parts)
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("ERROR baca file: %w", err)
 	}
 
 	return triangles, allVertices, nil
