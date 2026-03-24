@@ -10,6 +10,7 @@ type Voxelizer struct {
 	Voxels          []Voxel
 	NodesPerLevel   []int
 	SkippedPerLevel []int
+	Stats           *AppStats // Statistics tracker for recording metrics
 	mu              sync.Mutex
 }
 
@@ -25,7 +26,7 @@ func NewVoxelizer(maxDepth int, triangles []Triangle) *Voxelizer {
 
 func (v *Voxelizer) Build(rootBox BoundingBox) {
 	var wg sync.WaitGroup
-	v.subdivide(rootBox, 0, v.Triangles, &wg, true)
+	v.subdivide(rootBox, 0, v.Triangles, &wg, false)
 	wg.Wait()
 }
 
@@ -41,6 +42,9 @@ func (v *Voxelizer) subdivide(box BoundingBox, depth int, triangles []Triangle, 
 		v.mu.Lock()
 		v.SkippedPerLevel[depth]++
 		v.mu.Unlock()
+		if v.Stats != nil {
+			v.Stats.RecordSkip(depth)
+		}
 		if isParallel {
 			wg.Done()
 		}
@@ -50,6 +54,9 @@ func (v *Voxelizer) subdivide(box BoundingBox, depth int, triangles []Triangle, 
 	v.mu.Lock()
 	v.NodesPerLevel[depth]++
 	v.mu.Unlock()
+	if v.Stats != nil {
+		v.Stats.RecordNode(depth)
+	}
 
 	if depth == v.MaxDepth {
 		v.mu.Lock()
@@ -58,6 +65,9 @@ func (v *Voxelizer) subdivide(box BoundingBox, depth int, triangles []Triangle, 
 			HalfSize: box.GetHalfSize(),
 		})
 		v.mu.Unlock()
+		if v.Stats != nil {
+			v.Stats.RecordVoxel()
+		}
 		if isParallel {
 			wg.Done()
 		}

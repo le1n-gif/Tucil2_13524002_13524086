@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// ReadOBJ membaca file .obj dan mengembalikan daftar segitiga dan semua vertex mentah
+// read file .obj dan return daftar segitiga dan semua vertex mentah
 func ReadOBJ(path string) ([]Triangle, []Vector3, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -38,7 +38,6 @@ func ReadOBJ(path string) ([]Triangle, []Vector3, error) {
 
 		} else if opcode == "f" {
 			// Parsing Face: f i j k
-			// Ingat: Indeks .obj dimulai dari 1, Go dimulai dari 0
 			idx1, _ := strconv.Atoi(strings.Split(parts[1], "/")[0])
 			idx2, _ := strconv.Atoi(strings.Split(parts[2], "/")[0])
 			idx3, _ := strconv.Atoi(strings.Split(parts[3], "/")[0])
@@ -58,7 +57,7 @@ func ReadOBJ(path string) ([]Triangle, []Vector3, error) {
 	return triangles, allVertices, nil
 }
 
-// WriteOBJ membuat file .obj baru berdasarkan daftar voxel yang ditemukan
+// create  file .obj baru berdasarkan daftar voxel yang ditemukan
 func WriteOBJ(path string, voxels []Voxel) error {
 	file, err := os.Create(path)
 	if err != nil {
@@ -75,24 +74,23 @@ func WriteOBJ(path string, voxels []Voxel) error {
 		c := voxel.Center
 		h := voxel.HalfSize
 
-		// 1. Generate 8 titik sudut untuk satu kubus (voxel)
+		// Generate 8 titik sudut untuk satu kubus (voxel)
 		vertices := []Vector3{
-			{c.X - h, c.Y - h, c.Z - h}, // 1
-			{c.X + h, c.Y - h, c.Z - h}, // 2
-			{c.X + h, c.Y + h, c.Z - h}, // 3
-			{c.X - h, c.Y + h, c.Z - h}, // 4
-			{c.X - h, c.Y - h, c.Z + h}, // 5
-			{c.X + h, c.Y - h, c.Z + h}, // 6
-			{c.X + h, c.Y + h, c.Z + h}, // 7
-			{c.X - h, c.Y + h, c.Z + h}, // 8
+			{c.X - h, c.Y - h, c.Z - h},
+			{c.X + h, c.Y - h, c.Z - h},
+			{c.X + h, c.Y + h, c.Z - h},
+			{c.X - h, c.Y + h, c.Z - h},
+			{c.X - h, c.Y - h, c.Z + h},
+			{c.X + h, c.Y - h, c.Z + h},
+			{c.X + h, c.Y + h, c.Z + h},
+			{c.X - h, c.Y + h, c.Z + h},
 		}
 
 		for _, v := range vertices {
 			fmt.Fprintf(writer, "v %f %f %f\n", v.X, v.Y, v.Z)
 		}
 
-		// 2. Generate 12 wajah segitiga untuk membentuk kubus
-		// Menggunakan offset vertexCount agar indeks merujuk ke vertex kubus ini
+		// Generate 12 face triangle buat bentuk kubus
 		base := vertexCount
 		faces := [][]int{
 			{1, 2, 3}, {1, 3, 4}, // Belakang
